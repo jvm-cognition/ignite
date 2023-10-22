@@ -144,7 +144,7 @@ module.exports = {
     const { kebabCase } = strings
     const { exists, path, removeAsync, copy, read, write, homedir } = filesystem
     const { info, colors, warning } = print
-    const { gray, cyan, yellow, underline, white } = colors
+    const { gray, cyan, yellow, underline, white, bold } = colors
     const options: Options = parameters.options
 
     const yname = boolFlag(options.y) || boolFlag(options.yes)
@@ -466,6 +466,25 @@ module.exports = {
     p()
     // #endregion
 
+    // #region run doctor
+    let doctorHasRun = false;
+    const runDoctor = async () => {
+      startSpinner(" Gathering system and project details")
+      try {
+        const IGNITE = "node " + filesystem.path(__dirname, "..", "..", "bin", "ignite")
+        const doctorResults = await system.run(`${IGNITE} doctor`)
+        p(`\n\n${doctorResults}`)
+        doctorHasRun = true
+      } catch (e) {
+        p(yellow("Unable to gather system and project details."))
+      }
+      stopSpinner(" Gathering system and project details", "🛠️")
+      p()
+      p(white(` Note: For additional information try re-running the command with the ${bold("\`--debug\`")} flag.`))
+      p()
+    }
+    // #endregion
+
     // #region Overwrite
     if (exists(targetPath) === "dir" && overwrite === true) {
       const msg = ` Tossing that old app like it's hot`
@@ -590,29 +609,50 @@ module.exports = {
     stopSpinner(renameSpinnerMsg, "🎨")
     // #endregion
 
+    // #region fresh install dependencies
     const shouldFreshInstallDeps = installDeps && shouldUseCache === false
     if (shouldFreshInstallDeps) {
       const unboxingMessage = `Installing ${packagerName} dependencies (wow these are heavy)`
       startSpinner(unboxingMessage)
-      await packager.install({ ...packagerOptions, onProgress: log })
-      stopSpinner(unboxingMessage, "🧶")
+      try {
+        await packager.install({ ...packagerOptions, onProgress: log })
+        stopSpinner(unboxingMessage, "🧶")
+      } catch (e) {
+        p(yellow("Unable to install dependencies."))
+        stopSpinner(unboxingMessage, "🧶")
+        log(e)
+        !doctorHasRun && await runDoctor()
+      }
     }
+    // #endregion
 
-    // remove the gitignore template
-    await removeAsync(".gitignore.template")
+    // #region remove the gitignore template
+    try {
+      await removeAsync(".gitignore.template")
+    } catch (e) {
+      log(e)
+      p(yellow("Unable to remove gitignore template."))
+    }
     // #endregion
 
     // #region Cache dependencies
     if (shouldFreshInstallDeps && cacheExists === false && useCache) {
       const msg = `Saving ${packagerName} dependencies for next time`
       startSpinner(msg)
-      log(targetPath)
-      await cache.copy({
-        fromRootDir: targetPath,
-        toRootDir: cachePath,
-        packagerName,
-      })
-      stopSpinner(msg, "📦")
+      try {
+        log(targetPath)
+        await cache.copy({
+          fromRootDir: targetPath,
+          toRootDir: cachePath,
+          packagerName,
+        })
+        stopSpinner(msg, "📦")
+      } catch (e) {
+        p(yellow("Unable to cache dependencies."))
+        stopSpinner(msg, "📦")
+        log(e)
+        !doctorHasRun && await runDoctor()
+      }
     }
     // #endregion
 
@@ -630,11 +670,13 @@ module.exports = {
         appJson.expo.plugins[1][1].ios.deploymentTarget = "13.4"
 
         write("./app.json", appJson)
+        stopSpinner(" Enabling New Architecture", "🆕")
       } catch (e) {
-        log(e)
         p(yellow("Unable to enable New Architecture."))
+        stopSpinner(" Enabling New Architecture", "🆕")
+        log(e)
+        !doctorHasRun && await runDoctor()
       }
-      stopSpinner(" Enabling New Architecture", "🆕")
     }
     // #endregion
 
@@ -645,11 +687,23 @@ module.exports = {
       if (needsPrebuild) {
         const prebuildMessage = ` Generating native template via Expo Prebuild`
         startSpinner(prebuildMessage)
-        await packager.run("prebuild:clean", { ...packagerOptions, onProgress: log })
-        stopSpinner(prebuildMessage, "🛠️")
+        try {
+          await packager.run("prebuild:clean", { ...packagerOptions, onProgress: log })
+          stopSpinner(prebuildMessage, "🛠️")
+        } catch (e) {
+          p(yellow("Unable to generate native templates."))
+          stopSpinner(prebuildMessage, "🛠️")
+          log(e)
+          !doctorHasRun && await runDoctor()
+        }
       }
       // Make sure all our modifications are formatted nicely
-      await packager.run("format", { ...packagerOptions, silent: !debug })
+      try {
+        await packager.run("format", { ...packagerOptions, silent: !debug })
+      } catch (e) {
+        log(e)
+        p(yellow("Unable to verify if modifications were formatted."))
+      }
     }
     // #endregion
 
@@ -693,10 +747,13 @@ module.exports = {
             `),
           )
         }
+        stopSpinner(" Backing everything up in source control", "🗄")
       } catch (e) {
         p(yellow("Unable to commit the initial changes. Please check your git username and email."))
+        stopSpinner(" Backing everything up in source control", "🗄")
+        log(e)
+        !doctorHasRun && await runDoctor()
       }
-      stopSpinner(" Backing everything up in source control", "🗄")
     }
 
     // back to the original directory
