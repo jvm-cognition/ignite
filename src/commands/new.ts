@@ -144,7 +144,7 @@ module.exports = {
     const { kebabCase } = strings
     const { exists, path, removeAsync, copy, read, write, homedir } = filesystem
     const { info, colors, warning } = print
-    const { gray, cyan, yellow, underline, white, bold } = colors
+    const { gray, cyan, yellow, white, underline,  bold } = colors
     const options: Options = parameters.options
 
     const yname = boolFlag(options.y) || boolFlag(options.yes)
@@ -618,8 +618,7 @@ module.exports = {
         await packager.install({ ...packagerOptions, onProgress: log })
         stopSpinner(unboxingMessage, "🧶")
       } catch (e) {
-        p(yellow("Unable to install dependencies."))
-        stopSpinner(unboxingMessage, "🧶")
+        stopSpinner(`${unboxingMessage}   ${yellow("Unable to install dependencies.")}`, "🧶")
         log(e)
         !doctorHasRun && await runDoctor()
       }
@@ -648,8 +647,7 @@ module.exports = {
         })
         stopSpinner(msg, "📦")
       } catch (e) {
-        p(yellow("Unable to cache dependencies."))
-        stopSpinner(msg, "📦")
+        stopSpinner(`${msg}   ${yellow("Unable to cache dependencies.")}`, "📦")
         log(e)
         !doctorHasRun && await runDoctor()
       }
@@ -658,7 +656,8 @@ module.exports = {
 
     // #region Enable New Architecture if requested (must happen before prebuild)
     if (experimentalNewArch === true) {
-      startSpinner(" Enabling New Architecture")
+      const enableArchitectureMessage = " Enabling New Architecture";
+      startSpinner(enableArchitectureMessage)
       try {
         const appJsonRaw = read("app.json")
         const appJson = JSON.parse(appJsonRaw)
@@ -670,10 +669,9 @@ module.exports = {
         appJson.expo.plugins[1][1].ios.deploymentTarget = "13.4"
 
         write("./app.json", appJson)
-        stopSpinner(" Enabling New Architecture", "🆕")
+        stopSpinner(enableArchitectureMessage, "🆕")
       } catch (e) {
-        p(yellow("Unable to enable New Architecture."))
-        stopSpinner(" Enabling New Architecture", "🆕")
+        stopSpinner(`${enableArchitectureMessage}   ${yellow("Unable to enable New Architecture.")}`, "🆕")
         log(e)
         !doctorHasRun && await runDoctor()
       }
@@ -691,8 +689,7 @@ module.exports = {
           await packager.run("prebuild:clean", { ...packagerOptions, onProgress: log })
           stopSpinner(prebuildMessage, "🛠️")
         } catch (e) {
-          p(yellow("Unable to generate native templates."))
-          stopSpinner(prebuildMessage, "🛠️")
+          stopSpinner(`${prebuildMessage}   ${yellow("Unable to generate native templates.")}`, "🛠️")
           log(e)
           !doctorHasRun && await runDoctor()
         }
@@ -728,7 +725,8 @@ module.exports = {
     // #region Create Git Repository and Initial Commit
     // commit any changes
     if (git === true) {
-      startSpinner(" Backing everything up in source control")
+      const initGitMessage = " Backing everything up in source control"
+      startSpinner(initGitMessage)
       try {
         const isWindows = process.platform === "win32"
 
@@ -747,10 +745,9 @@ module.exports = {
             `),
           )
         }
-        stopSpinner(" Backing everything up in source control", "🗄")
+        stopSpinner(initGitMessage, "🗄")
       } catch (e) {
-        p(yellow("Unable to commit the initial changes. Please check your git username and email."))
-        stopSpinner(" Backing everything up in source control", "🗄")
+        stopSpinner(`${initGitMessage}   ${yellow("Unable to commit the initial changes. Please check your git username and email.")}`, "🗄")
         log(e)
         !doctorHasRun && await runDoctor()
       }
