@@ -11,6 +11,7 @@ import {
   p,
   startSpinner,
   stopSpinner,
+  stopLastSpinner,
   clearSpinners,
   ascii,
   em,
@@ -144,13 +145,15 @@ module.exports = {
     const { kebabCase } = strings
     const { exists, path, removeAsync, copy, read, write, homedir } = filesystem
     const { info, colors, warning } = print
-    const { gray, cyan, yellow, underline, white } = colors
+    const { gray, cyan, yellow, white, red, underline } = colors
     const options: Options = parameters.options
 
     const yname = boolFlag(options.y) || boolFlag(options.yes)
     const useDefault = (option: unknown) => yname && option === undefined
 
     const CMD_INDENT = "  "
+    /** Add just a _little_ more spacing to match with spinners and heading */
+    const p2 = (m = "") => p(` ${m}`)
     const command = (cmd: string) => p2(white(CMD_INDENT + cmd))
 
     // #endregion
@@ -445,6 +448,7 @@ module.exports = {
 
     // #region Print Welcome
     // welcome everybody!
+    try {
     const terminalWidth = process.stdout.columns ?? 80
     const logo =
       terminalWidth > 80 ? () => ascii("logo.ascii.txt") : () => ascii("logo-sm.ascii.txt")
@@ -713,9 +717,6 @@ module.exports = {
     // we're done! round performance stats to .xx digits
     const perfDuration = Math.round((new Date().getTime() - perfStart) / 10) / 100
 
-    /** Add just a _little_ more spacing to match with spinners and heading */
-    const p2 = (m = "") => p(` ${m}`)
-
     p2(`Ignited ${em(`${projectName}`)} in ${gray(`${perfDuration}s`)}  🚀 `)
     p2()
     const cliCommand = buildCliCommand({
@@ -792,6 +793,20 @@ module.exports = {
     // like I/O operations to process.stdout and process.stderr
     // see https://github.com/infinitered/ignite/issues/2084
     process.exit(0)
+    } catch (e) {
+      stopLastSpinner('❌')
+      p2(red(`\nThe following error occured:\n${e}`))
+      startSpinner(" Gathering system and project details")
+      try {
+        const IGNITE = "node " + filesystem.path(__dirname, "..", "..", "bin", "ignite")
+        const doctorResults = await system.run(`${IGNITE} doctor`)
+        p(`\n\n${doctorResults}`)
+      } catch (e) {
+        p(yellow("Unable to gather system and project details."))
+      }
+      stopSpinner(" Gathering system and project details", "🛠️")
+      process.exit(0)
+    }
   },
 }
 
