@@ -105,11 +105,11 @@ export const stopSpinner = (m: string, symbol: string) => {
 }
 
 export const stopLastSpinner = (symbol: string) => {
-  const lastKey = Object.keys(spinners).pop();
+  const lastKey = Object.keys(spinners).pop()
   if (lastKey) {
-    const lastSpinner = spinners[lastKey];
-    lastSpinner.stopAndPersist({ symbol });
-    delete spinners[lastKey];
+    const lastSpinner = spinners[lastKey]
+    lastSpinner.stopAndPersist({ symbol })
+    delete spinners[lastKey]
   }
 }
 
